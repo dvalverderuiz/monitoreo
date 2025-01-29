@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  cli:
+    build: .
+    container_name: tmd_cli
+    stdin_open: true
+    tty: true
+    command: python cli/tmd_cli.py
+
+  web:
+    build: .
+    container_name: tmd_web
+    ports:
+      - "5000:5000"
+    command: python web/app.py

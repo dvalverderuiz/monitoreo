@@ -10,8 +10,18 @@ Por esto creemos que debemos de enfocar el proyecto mas de esta manera que expli
 
 La aplicación estará ya totalmente creada con docker en un repositorio de github, el usuario (principalmente una empresa que desee monitorear gran volumen de dispositivos) la desplegará en 3 sencillos pasos:
 
-1. git clone (repositorio de la aplicación)
-2. docker-compose up -d
-3. Entrar a localhost:5000
-
+```
+git clone https://github.com/dvalverderuiz/TMD.git
+```
+```
+docker-compose up -d
+```
+```
+localhost:5000
+```
 Nuestro sistema de monitoreo ya estara configurado en el repositorio de github, el usuario solo deberá de clonarlo y levantarlo. Esto levantar 
+
+
+DEMO <br>
+<br>
+![image](https://github.com/user-attachments/assets/79647d06-6950-4b3c-b9dc-429558ca9d2d)

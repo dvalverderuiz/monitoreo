@@ -1,0 +1,2 @@
+sudo ufw allow from 192.168.1.1 to any port 161 proto udp
+sudo ufw reload

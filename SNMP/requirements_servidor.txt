@@ -1,0 +1,9 @@
+sudo apt update && sudo apt install -y snmp snmpd snmp-mibs-downloader
+
+
+sudo nano /etc/snmp/snmpd.conf
+
+
+# Permitir acceso SNMP desde toda la red 192.168.1.0/24
+agentAddress udp:161
+rocommunity public 192.168.1.0/24

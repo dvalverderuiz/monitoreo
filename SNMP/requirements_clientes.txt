@@ -1,0 +1,10 @@
+sudo apt update && sudo apt install -y snmpd
+
+
+sudo nano /etc/snmp/snmpd.conf
+
+
+agentAddress udp:161  # Escucha en el puerto SNMP
+rocommunity public 192.168.1.1
+sysLocation "Oficina"
+sysContact "admin@example.com"

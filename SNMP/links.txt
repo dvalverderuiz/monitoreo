@@ -7,3 +7,9 @@ https://www.manageengine.com/latam/network-configuration-manager/configuracion-d
 https://www.logicmonitor.com/support/monitoring/os-virtualization/snmp-v3-configuration
 https://www.xmodulo.com/configure-snmpv3-ubuntu-centos-cisco.html
 https://networklogician.com/2021/04/04/configuring-snmpv3-in-linux/
+
+
+
+# Papers SNMPv3c (2002)
+
+https://datatracker.ietf.org/doc/html/rfc3410#page-18 

@@ -1,6 +1,10 @@
 https://www.manageengine.com/latam/network-configuration-manager/configuracion-de-snmpv3.html
 
 
+# SNMP para Alpines
+https://wiki.alpinelinux.org/wiki/Obtaining_user_information_via_SNMP
+
+
 
 # SNMPv3 -> Configuración para cifrado de los datos de manera segura
 

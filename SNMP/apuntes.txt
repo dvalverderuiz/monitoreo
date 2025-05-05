@@ -1,0 +1,27 @@
+- Abstract
+- Explicar core
+
+
+SNMP:
+apk add net-snmp
+rc-update add snmpd
+rc-service snmpd start
+rc-service snmpd restart
+
+
+/etc/snmp/snmpd.conf:
+rocommunity public
+sysLocation "Lab"
+sysContact admin@example.com
+
+
+Peticiones:
+snmpwalk -v2c -c public IP
+snmpwalk -v2c -c public IP OID
+
+
+OID:
+iso.3.6.1.2.1.1.1.0 -> Nombre de máquina + versión + OS
+iso.3.6.1.2.1.1.4.0 -> SysContact
+iso.3.6.1.2.1.1.5.0 -> Nombre en /etc/snmp/snmpd.conf
+iso.3.6.1.2.1.1.6.0 -> SysLocation

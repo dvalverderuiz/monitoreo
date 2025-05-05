@@ -1,6 +1,6 @@
 - Abstract
 - Explicar core
-
+- Arreglar esquema
 
 SNMP:
 apk add net-snmp

@@ -12,6 +12,7 @@ def get_local_ip():
             for link in netifaces.ifaddresses(iface)[netifaces.AF_INET]:
                 ip = link['addr']
                 if ip != '127.0.0.1':
+                    print(ip, link['netmask'])
                     return ip, link['netmask']
     return None, None
 

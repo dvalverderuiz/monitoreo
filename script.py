@@ -67,6 +67,20 @@ def scan_snmp_hosts(network, community='public'):
     
     return responsive_hosts
 
+def test_alpine_client():
+    """Función específica para probar el cliente Alpine"""
+    alpine_ip = "30.20.10.113"
+    console.print(f"\n[bold]Probando conexión específica a Alpine ({alpine_ip})[/bold]")
+    
+    oids_to_test = [
+        ('1.3.6.1.2.1.1.1.0', 'System Description'),
+        ('1.3.6.1.2.1.1.5.0', 'System Name'),
+    ]
+    
+    for oid, desc in oids_to_test:
+        result = snmp_get(alpine_ip, oid)
+        console.print(f"{desc} ({oid}): {result}")
+
 def main():
     # Verificar si snmpget está instalado
     try:
@@ -85,9 +99,12 @@ def main():
         return
 
     console.print(f"[green]IP local detectada:[/green] {ip}/{netmask}")
-    net = ipaddress.IPv4Network(f"{ip}/{netmask}", strict=False)
     
-    # Escanear
+    # Probar específicamente el Alpine primero
+    test_alpine_client()
+    
+    # Escanear toda la red
+    net = ipaddress.IPv4Network(f"{ip}/{netmask}", strict=False)
     start_time = time.time()
     clients = scan_snmp_hosts(net)
     scan_duration = time.time() - start_time

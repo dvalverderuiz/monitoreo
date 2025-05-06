@@ -136,4 +136,46 @@ def main():
         return
 
     # Mostrar resultados
-    console.print(f"\n[bold]Escaneo completado
+    console.print(f"\n[bold]Escaneo completado en {scan_duration:.2f} segundos[/bold]")
+    table = Table(title="Dispositivos SNMP encontrados", header_style="bold magenta")
+    table.add_column("IP", style="cyan")
+    table.add_column("Nombre", style="yellow")
+    table.add_column("Sistema", style="green")
+    table.add_column("Interfaces")
+    table.add_column("Ubicación")
+
+    for client in clients:
+        info = get_system_info(client)
+        
+        # Acortar información larga
+        os_info = info['os'][:50] + "..." if len(info['os']) > 50 else info['os']
+        interfaces = ", ".join(info['interfaces'][:3]) + ("..." if len(info['interfaces']) > 3 else "")
+        
+        table.add_row(
+            client,
+            info['name'],
+            os_info,
+            interfaces,
+            info['location']
+        )
+
+    console.print(table)
+
+    # Mostrar información detallada para el Alpine específicamente
+    alpine_ip = "30.20.10.113"
+    if alpine_ip in clients:
+        console.print(f"\n[bold]Información detallada para Alpine ({alpine_ip}):[/bold]")
+        alpine_info = get_system_info(alpine_ip)
+        for key, value in alpine_info.items():
+            if key != 'interfaces':
+                console.print(f"{key.capitalize():<10}: {value}")
+        
+        if alpine_info['interfaces']:
+            console.print("\nInterfaces de red:")
+            for interface in alpine_info['interfaces']:
+                if_desc = snmp_walk(alpine_ip, f'1.3.6.1.2.1.2.2.1.2.{interface}')
+                if if_desc:
+                    console.print(f" - {interface}: {if_desc[0].split()[-1]}")
+
+if __name__ == "__main__":
+    main()

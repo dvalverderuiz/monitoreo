@@ -10,9 +10,15 @@ https://bmatwifilabs.wordpress.com/wp-content/uploads/2019/05/screen-shot-2019-0
 
 SNMP:
 apk add net-snmp
-rc-update add snmpd
+
+# Verificar estado
+rc-service snmpd status
+# Iniciar servicio
 rc-service snmpd start
+# Reiniciar servicio
 rc-service snmpd restart
+# Habilitar al inicio
+rc-update add snmpd
 
 
 /etc/snmp/snmpd.conf:

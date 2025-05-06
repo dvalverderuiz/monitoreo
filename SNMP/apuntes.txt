@@ -4,6 +4,7 @@
 
 Observaciones:
 - El escaneo de red detecta bien la red pero no los dispositivos en ella.
+https://bmatwifilabs.wordpress.com/wp-content/uploads/2019/05/screen-shot-2019-05-29-at-3.04.25-pm.png
 
 
 SNMP:

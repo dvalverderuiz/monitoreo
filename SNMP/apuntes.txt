@@ -2,7 +2,8 @@
 - Explicar core
 - Arreglar esquema
 
-
+Observaciones:
+- El escaneo de red detecta bien la red pero no los dispositivos en ella.
 
 
 SNMP:

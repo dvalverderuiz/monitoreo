@@ -4,6 +4,7 @@
 
 Observaciones:
 - El escaneo de red detecta bien la red pero no los dispositivos en ella.
+- Ahora el script se ejecuta y encuentra la IP 30.20.10.10 (local del servidor) pero no la IP 30.20.10.113 (cliente)
 https://bmatwifilabs.wordpress.com/wp-content/uploads/2019/05/screen-shot-2019-05-29-at-3.04.25-pm.png
 
 

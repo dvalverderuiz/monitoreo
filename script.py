@@ -1,5 +1,4 @@
 import netifaces
-import nmap
 from pysnmp.hlapi import *
 from rich.console import Console
 from rich.table import Table
@@ -16,13 +15,6 @@ def get_local_ip():
                     return ip, link['netmask']
     return None, None
 
-def scan_network(ip, netmask):
-    net = ipaddress.IPv4Network(f"{ip}/{netmask}", strict=False)
-    scanner = nmap.PortScanner()
-    console.print(f"[bold cyan]Escaneando red: {net} (puerto UDP 161)...[/bold cyan]")
-    scanner.scan(hosts=str(net), arguments='-p 161 --open -sU -T4')
-    return [host for host in scanner.all_hosts() if scanner[host].has_udp(161)]
-
 def snmp_get(ip, oid, community='public'):
     try:
         iterator = getCmd(SnmpEngine(),
@@ -38,6 +30,15 @@ def snmp_get(ip, oid, community='public'):
     except Exception:
         return "N/A"
 
+def scan_snmp_hosts(network):
+    responsive_hosts = []
+    console.print(f"[bold cyan]Escaneando red: {network} (consulta SNMP directa)...[/bold cyan]")
+    for ip in network.hosts():
+        sys_descr = snmp_get(str(ip), '1.3.6.1.2.1.1.1.0')
+        if sys_descr != "N/A":
+            responsive_hosts.append(str(ip))
+    return responsive_hosts
+
 def main():
     ip, netmask = get_local_ip()
     if not ip:
@@ -45,7 +46,8 @@ def main():
         return
 
     console.print(f"[green]IP local detectada:[/green] {ip}/{netmask}")
-    clients = scan_network(ip, netmask)
+    net = ipaddress.IPv4Network(f"{ip}/{netmask}", strict=False)
+    clients = scan_snmp_hosts(net)
 
     if not clients:
         console.print("[yellow]No se encontraron dispositivos SNMP activos.[/yellow]")
@@ -69,4 +71,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

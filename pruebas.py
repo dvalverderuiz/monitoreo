@@ -3,7 +3,6 @@ from rich.console import Console
 from rich.table import Table
 import time
 import re
-import sys
 import argparse
 
 console = Console()
@@ -13,24 +12,20 @@ def clean_snmp_output(output):
     if not output:
         return "N/A"
     
-    # Elimina el tipo (STRING:, Hex-STRING:, etc.)
     if ': ' in output:
         output = output.split(': ', 1)[1]
     
-    # Elimina comillas dobles y escapadas
     output = output.replace('\"', '').strip()
+
+    if output.startswith('Timeticks: ('):
+        return format_uptime(output)
     
     return output if output else "N/A"
 
 def format_uptime(ticks):
     """Formatea los ticks de uptime a días/horas/minutos"""
     try:
-        # Extrae el número entre paréntesis
-        match = re.search(r'\((\d+)\)', ticks)
-        if not match:
-            return ticks
-        
-        ticks = int(match.group(1)) // 100  # Convertir a segundos
+        ticks = int(re.search(r'\((\d+)\)', ticks).group(1)) // 100
         days = ticks // (24*3600)
         hours = (ticks % (24*3600)) // 3600
         minutes = (ticks % 3600) // 60
@@ -59,7 +54,6 @@ def get_system_info(ip, community='public'):
     """Obtiene información básica del sistema"""
     info = {'ip': ip}
     
-    # Verificar si el host está activo
     try:
         subprocess.run(
             ['ping', '-c', '1', '-W', '1', ip],
@@ -70,7 +64,6 @@ def get_system_info(ip, community='public'):
     except:
         return None
     
-    # OIDs para información básica
     oid_mapping = {
         'System Description': '1.3.6.1.2.1.1.1.0',
         'System Name': '1.3.6.1.2.1.1.5.0',
@@ -82,13 +75,12 @@ def get_system_info(ip, community='public'):
     for desc, oid in oid_mapping.items():
         value = get_snmp_data(ip, community, oid)
         if value:
-            cleaned = clean_snmp_output(value)
-            info[desc] = format_uptime(cleaned) if desc == 'Uptime' else cleaned
+            info[desc] = clean_snmp_output(value)
     
     return info if len(info) > 1 else None
 
 def get_interfaces_info(ip, community='public'):
-    """Obtiene información de interfaces de red"""
+    """Obtiene información de interfaces de red con mejor formato"""
     try:
         result = subprocess.run(
             ['snmpwalk', '-v2c', '-c', community, '-t', '1', '-r', '0', ip, '1.3.6.1.2.1.2.2.1'],
@@ -101,7 +93,6 @@ def get_interfaces_info(ip, community='public'):
             return None
             
         interfaces = {}
-        current_if = None
         
         for line in result.stdout.splitlines():
             if '=' not in line:
@@ -113,13 +104,12 @@ def get_interfaces_info(ip, community='public'):
             if len(oid_parts) < 2:
                 continue
                 
-            if_index = oid_parts[-2]
-            oid_type = oid_parts[-1]
-            
+            oid_type = oid_parts[-2]
+            if_index = oid_parts[-1]
             value = value_part.strip()
             
             if if_index not in interfaces:
-                interfaces[if_index] = {'id': if_index}
+                interfaces[if_index] = {}
             
             if oid_type == '2':  # Interface Description
                 interfaces[if_index]['name'] = clean_snmp_output(value)
@@ -131,7 +121,7 @@ def get_interfaces_info(ip, community='public'):
             elif oid_type == '8':  # Interface Status
                 interfaces[if_index]['status'] = 'Up' if '1' in value else 'Down'
         
-        # Filtrar interfaces válidas (deben tener al menos nombre o MAC)
+        # Filtrar interfaces válidas
         valid_interfaces = {}
         for if_id, if_data in interfaces.items():
             if 'name' in if_data or 'mac' in if_data:
@@ -144,7 +134,7 @@ def get_interfaces_info(ip, community='public'):
         return None
 
 def display_devices_table(devices):
-    """Muestra la tabla de dispositivos"""
+    """Muestra la tabla de dispositivos con formato mejorado"""
     if not devices:
         console.print("[red]No se encontraron dispositivos SNMP.[/red]")
         return
@@ -170,8 +160,9 @@ def display_devices_table(devices):
     console.print(table)
 
 def display_interfaces_table(devices):
-    """Muestra las tablas de interfaces para cada dispositivo"""
+    """Muestra las interfaces con el formato del segundo script"""
     if not devices:
+        console.print("[yellow]No hay dispositivos para mostrar interfaces[/yellow]")
         return
     
     for device in devices:
@@ -187,8 +178,7 @@ def display_interfaces_table(devices):
         if_table.add_column("MAC")
         if_table.add_column("Estado")
         
-        for if_id in sorted(interfaces.keys(), key=lambda x: int(x)):
-            if_data = interfaces[if_id]
+        for if_id, if_data in sorted(interfaces.items(), key=lambda x: int(x[0])):
             if_table.add_row(
                 if_id,
                 if_data.get('name', 'N/A'),
@@ -199,9 +189,8 @@ def display_interfaces_table(devices):
         console.print(if_table)
 
 def main():
-    # Configuración de argumentos
     parser = argparse.ArgumentParser(description='Monitor de dispositivos SNMP')
-    parser.add_argument('comando', choices=['dispositivos', 'interfaces', 'todo'], 
+    parser.add_argument('modo', choices=['dispositivos', 'interfaces', 'todo'], 
                        help='Qué información mostrar (dispositivos, interfaces, todo)')
     parser.add_argument('--ips', nargs='+', default=['30.20.10.10', '30.20.10.113'],
                        help='Direcciones IP a escanear')
@@ -210,7 +199,6 @@ def main():
     
     args = parser.parse_args()
     
-    # Verificar instalación de net-snmp
     try:
         subprocess.run(['snmpget', '-v'], 
                       stdout=subprocess.DEVNULL,
@@ -221,7 +209,6 @@ def main():
         console.print("Instálalo con: sudo apt-get install snmp")
         return
     
-    # Escaneo de dispositivos
     start_time = time.time()
     devices = []
     
@@ -232,16 +219,15 @@ def main():
     
     elapsed_time = time.time() - start_time
     
-    # Mostrar información según el comando
-    if args.comando == 'dispositivos':
+    if args.modo == 'dispositivos':
         display_devices_table(devices)
-    elif args.comando == 'interfaces':
+    elif args.modo == 'interfaces':
         display_interfaces_table(devices)
-    elif args.comando == 'todo':
+    elif args.modo == 'todo':
         display_devices_table(devices)
         display_interfaces_table(devices)
     
-    console.print(f"\nTiempo de escaneo: {elapsed_time:.2f} segundos")
+    console.print(f"\nTiempo de escaneo: [bold cyan]{elapsed_time:.2f}[/bold cyan] segundos")
 
 if __name__ == "__main__":
     main()

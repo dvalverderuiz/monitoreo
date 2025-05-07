@@ -22,6 +22,15 @@ def clean_snmp_output(output):
     
     return output if output else "N/A"
 
+def clean_mac_address(mac):
+    """Limpia y formatea correctamente una dirección MAC"""
+    # Eliminar todos los caracteres no hexadecimales
+    clean_mac = re.sub(r'[^0-9A-Fa-f]', '', mac)
+    # Formatear en pares de caracteres separados por :
+    if len(clean_mac) == 12:  # Longitud correcta para MAC
+        return ':'.join([clean_mac[i:i+2] for i in range(0, 12, 2)]).lower()
+    return mac  # Si no tiene formato válido, devolver original
+
 def format_uptime(ticks):
     """Formatea los ticks de uptime a días/horas/minutos"""
     try:
@@ -116,8 +125,7 @@ def get_interfaces_info(ip, community='public'):
             elif oid_type == '6':  # MAC Address
                 if 'Hex-STRING:' in value:
                     mac = value.replace('Hex-STRING:', '').strip().upper()
-                    mac = ':'.join([mac[i:i+2] for i in range(0, len(mac.replace(' ', '')), 2)])
-                    interfaces[if_index]['mac'] = mac
+                    interfaces[if_index]['mac'] = clean_mac_address(mac)
             elif oid_type == '8':  # Interface Status
                 interfaces[if_index]['status'] = 'Up' if '1' in value else 'Down'
         
@@ -160,7 +168,7 @@ def display_devices_table(devices):
     console.print(table)
 
 def display_interfaces_table(devices):
-    """Muestra las interfaces con el formato del segundo script"""
+    """Muestra las interfaces con el formato mejorado"""
     if not devices:
         console.print("[yellow]No hay dispositivos para mostrar interfaces[/yellow]")
         return

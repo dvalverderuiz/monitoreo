@@ -200,7 +200,7 @@ def main():
     parser = argparse.ArgumentParser(description='Monitor de dispositivos SNMP')
     parser.add_argument('modo', choices=['dispositivos', 'interfaces', 'todo'], 
                        help='Qué información mostrar (dispositivos, interfaces, todo)')
-    parser.add_argument('--ips', nargs='+', default=['30.20.10.10', '30.20.10.113'],
+    parser.add_argument('--ips', nargs='+', default=['30.20.10.10', '30.20.10.113', '30.20.10.114'],
                        help='Direcciones IP a escanear')
     parser.add_argument('--comunidad', default='public',
                        help='Comunidad SNMP (por defecto: public)')

@@ -1,110 +1,119 @@
-import subprocess
-from rich.console import Console
-from rich.table import Table
+#!/usr/bin/env python3
+
+from pysnmp.hlapi import *
+from tabulate import tabulate
 import time
+import os
+import sys
 
-console = Console()
+# Dispositivos a escanear
+dispositivos = [
+    {"ip": "30.20.10.10"},
+    {"ip": "30.20.10.113"},
+]
 
-def snmp_scan(target_ips, community='public'):
-    """Escanea direcciones IP específicas con SNMP"""
-    results = []
-    
-    for ip in target_ips:
-        console.print(f"\n[bold]Probando {ip}...[/bold]")
-        
-        # Primero probamos ping para ver si el host está vivo
-        try:
-            subprocess.run(
-                ['ping', '-c', '1', '-W', '1', ip],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            console.print(f"[green]✔ {ip} responde a ping[/green]")
-        except:
-            console.print(f"[yellow]✖ {ip} no responde a ping[/yellow]")
-            continue
-        
-        # Luego probamos SNMP
-        oids = [
-            ('1.3.6.1.2.1.1.1.0', 'System Description'),
-            ('1.3.6.1.2.1.1.5.0', 'System Name'),
-            ('1.3.6.1.2.1.1.6.0', 'Location')
-        ]
-        
-        device_info = {'ip': ip}
-        
-        for oid, desc in oids:
-            try:
-                result = subprocess.run(
-                    ['snmpget', '-v2c', '-c', community, '-t', '1', '-r', '0', ip, oid],
-                    capture_output=True,
-                    text=True,
-                    timeout=2
-                )
-                
-                if result.returncode == 0:
-                    output = result.stdout.strip()
-                    if '=' in output:
-                        value = output.split('=')[1].strip()
-                        device_info[desc] = value
-                        console.print(f"[green]  {desc}: {value}[/green]")
-                    else:
-                        device_info[desc] = output
-                else:
-                    console.print(f"[yellow]  {desc}: No response[/yellow]")
-            except Exception as e:
-                console.print(f"[red]  Error en {desc}: {str(e)}[/red]")
-        
-        if len(device_info) > 1:  # Si obtuvo al menos una respuesta SNMP
-            results.append(device_info)
-    
-    return results
+# OIDs relevantes
+oid_sysdescr = '1.3.6.1.2.1.1.1.0'
+oid_sysname = '1.3.6.1.2.1.1.5.0'
+oid_syslocation = '1.3.6.1.2.1.1.6.0'
+oid_sysuptime = '1.3.6.1.2.1.1.3.0'
+oid_syscontact = '1.3.6.1.2.1.1.4.0'
+oid_ifdescr = '1.3.6.1.2.1.2.2.1.2'
+oid_ifphysaddr = '1.3.6.1.2.1.2.2.1.6'
+oid_ifoperstatus = '1.3.6.1.2.1.2.2.1.8'
 
-def main():
-    # Verificar instalación de snmpget
-    try:
-        subprocess.run(['snmpget', '-v'], 
-                      stdout=subprocess.DEVNULL,
-                      stderr=subprocess.DEVNULL,
-                      timeout=2)
-    except:
-        console.print("[red]Error: net-snmp no está instalado.[/red]")
-        console.print("Instálalo con: sudo apt-get install snmp")
-        return
+# Función SNMP GET
+def snmp_get(ip, oid):
+    for (errorIndication, errorStatus, errorIndex, varBinds) in getCmd(
+        SnmpEngine(),
+        CommunityData('public'),
+        UdpTransportTarget((ip, 161), timeout=1, retries=0),
+        ContextData(),
+        ObjectType(ObjectIdentity(oid))
+    ):
+        if errorIndication or errorStatus:
+            return None
+        for varBind in varBinds:
+            return varBind[1]
+    return None
 
-    # IPs específicas a escanear (en lugar de todo el rango)
-    target_ips = [
-        '30.20.10.10',   # Tu servidor
-        '30.20.10.113'   # Tu cliente Alpine
-    ]
-    
-    # Escaneo dirigido
-    start_time = time.time()
-    devices = snmp_scan(target_ips)
-    elapsed_time = time.time() - start_time
-    
-    # Mostrar resultados
-    if devices:
-        table = Table(title="Dispositivos SNMP", header_style="bold blue")
-        table.add_column("IP", style="cyan")
-        table.add_column("Nombre")
-        table.add_column("Descripción")
-        table.add_column("Ubicación")
-        
-        for device in devices:
-            table.add_row(
-                device['ip'],
-                device.get('System Name', 'N/A'),
-                device.get('System Description', 'N/A')[:50] + '...' if 'System Description' in device else 'N/A',
-                device.get('Location', 'N/A')
-            )
-        
-        console.print(table)
-    else:
-        console.print("[red]No se encontraron dispositivos SNMP.[/red]")
-    
-    console.print(f"\nTiempo de escaneo: {elapsed_time:.2f} segundos")
+# Función SNMP WALK
+def snmp_walk(ip, oid):
+    resultados = []
+    for (errorIndication, errorStatus, errorIndex, varBinds) in nextCmd(
+        SnmpEngine(),
+        CommunityData('public'),
+        UdpTransportTarget((ip, 161), timeout=1, retries=0),
+        ContextData(),
+        ObjectType(ObjectIdentity(oid)),
+        lexicographicMode=False
+    ):
+        if errorIndication or errorStatus:
+            break
+        for varBind in varBinds:
+            resultados.append((str(varBind[0]), varBind[1]))
+    return resultados
 
+# Mostrar tabla de dispositivos
+def mostrar_usuarios():
+    tabla = []
+    for dispositivo in dispositivos:
+        ip = dispositivo["ip"]
+        print(f"Probando {ip}...")
+        response = os.system(f"ping -c 1 -W 1 {ip} > /dev/null 2>&1")
+        if response == 0:
+            descripcion = snmp_get(ip, oid_sysdescr) or "N/A"
+            nombre = snmp_get(ip, oid_sysname) or "N/A"
+            ubicacion = snmp_get(ip, oid_syslocation) or "N/A"
+            contacto = snmp_get(ip, oid_syscontact) or "N/A"
+            uptime = snmp_get(ip, oid_sysuptime)
+            uptime_str = f"({uptime}) {int(uptime) // 8640000} days, {(int(uptime) // 100) % 864}:%02d:%02d" % ((int(uptime) // 100) % 60, int(uptime) % 100) if uptime else "N/A"
+            tabla.append([ip, nombre, descripcion, ubicacion, uptime_str, contacto])
+    print("\n" + tabulate(tabla, headers=["IP", "Nombre", "Descripción", "Ubicación", "Uptime", "Contacto"], tablefmt="grid"))
+
+# Mostrar tabla de interfaces
+def mostrar_interfaces():
+    for dispositivo in dispositivos:
+        ip = dispositivo["ip"]
+        nombre_host = snmp_get(ip, oid_sysname) or "N/A"
+        print(f"\nInterfaces de {nombre_host}")
+        interfaces = snmp_walk(ip, oid_ifdescr)
+        macs = snmp_walk(ip, oid_ifphysaddr)
+        estados = snmp_walk(ip, oid_ifoperstatus)
+
+        tabla = []
+        for i, (oid, nombre) in enumerate(interfaces):
+            mac_val = macs[i][1] if i < len(macs) else None
+            estado_val = estados[i][1] if i < len(estados) else "N/A"
+
+            # MAC format
+            if isinstance(mac_val, OctetString):
+                mac = ':'.join(f'{b:02X}' for b in bytes(mac_val))
+            else:
+                mac = "N/A"
+
+            # Estado interpretable
+            estados_map = {"1": "Up", "2": "Down", "3": "Testing"}
+            estado = estados_map.get(str(estado_val), "N/A")
+
+            tabla.append([i+1, str(nombre), mac, estado])
+        print(tabulate(tabla, headers=["ID", "Nombre", "MAC", "Estado"], tablefmt="grid"))
+
+# MAIN
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) < 2:
+        print("Uso: python3 monitoreo/tmd.py [usuarios|interfaces]")
+        sys.exit(1)
+
+    inicio = time.time()
+
+    if sys.argv[1] == "usuarios":
+        mostrar_usuarios()
+    elif sys.argv[1] == "interfaces":
+        mostrar_interfaces()
+    else:
+        print("Opción no válida. Usa: usuarios o interfaces")
+        sys.exit(1)
+
+    fin = time.time()
+    print(f"\nTiempo de escaneo: {round(fin - inicio, 2)} segundos")

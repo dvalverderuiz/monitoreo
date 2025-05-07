@@ -187,7 +187,7 @@ def display_interfaces_table(devices):
         if_table.add_column("MAC")
         if_table.add_column("Estado")
         
-        for if_id in sorted(interfaces.keys(), key=lambda x: int(x))):
+        for if_id in sorted(interfaces.keys(), key=lambda x: int(x)):
             if_data = interfaces[if_id]
             if_table.add_row(
                 if_id,

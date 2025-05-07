@@ -7,12 +7,31 @@ import re
 console = Console()
 
 def clean_snmp_output(output):
-    """Limpia la salida SNMP eliminando 'STRING: ' y comillas"""
-    if 'STRING: ' in output:
-        output = output.split('STRING: ')[1]
-    if output.startswith('"') and output.endswith('"'):
-        output = output[1:-1]
-    return output.strip()
+    """Limpia la salida SNMP eliminando tipos y comillas"""
+    # Elimina 'STRING: ', 'Hex-STRING: ', etc.
+    if ': ' in output:
+        output = output.split(': ', 1)[1]
+    
+    # Elimina comillas dobles y escapadas
+    output = output.replace('\"', '').strip()
+    
+    # Caso especial para Timeticks
+    if output.startswith('Timeticks: ('):
+        return format_uptime(output)
+    
+    return output
+
+def format_uptime(ticks):
+    """Formatea los ticks de uptime a días/horas/minutos"""
+    try:
+        # Extrae el número entre paréntesis
+        ticks = int(re.search(r'\((\d+)\)', ticks).group(1)) // 100  # Convertir a segundos
+        days = ticks // (24*3600)
+        hours = (ticks % (24*3600)) // 3600
+        minutes = (ticks % 3600) // 60
+        return f"{days}d {hours}h {minutes}m"
+    except:
+        return ticks
 
 def snmp_scan(target_ips, community='public'):
     """Escanea direcciones IP específicas con SNMP"""
@@ -45,7 +64,7 @@ def snmp_scan(target_ips, community='public'):
         
         # Información de interfaces de red
         interface_oids = [
-            ('1.3.6.1.2.1.2.2.1.6', 'MAC Address'),  # Dirección física
+            ('1.3.6.1.2.1.2.2.1.6', 'MAC Address'),
             ('1.3.6.1.2.1.2.2.1.2', 'Interface Description'),
             ('1.3.6.1.2.1.2.2.1.8', 'Interface Status'),
         ]
@@ -65,13 +84,13 @@ def snmp_scan(target_ips, community='public'):
                 if result.returncode == 0:
                     output = result.stdout.strip()
                     if '=' in output:
-                        value = output.split('=')[1].strip()
+                        value = output.split('=', 1)[1].strip()
                         device_info[desc] = clean_snmp_output(value)
                         console.print(f"[green]  {desc}: {device_info[desc]}[/green]")
             except Exception as e:
                 console.print(f"[red]  Error en {desc}: {str(e)}[/red]")
         
-        # Obtener información de interfaces (usamos snmpwalk)
+        # Obtener información de interfaces
         try:
             result = subprocess.run(
                 ['snmpwalk', '-v2c', '-c', community, '-t', '1', '-r', '0', ip, '1.3.6.1.2.1.2.2.1'],
@@ -82,43 +101,40 @@ def snmp_scan(target_ips, community='public'):
             
             if result.returncode == 0:
                 interfaces = {}
-                current_if = None
                 
                 for line in result.stdout.splitlines():
-                    if '1.3.6.1.2.1.2.2.1.2' in line:  # Descripción de interfaz
-                        if_index = line.split('.')[-2]
-                        if_name = clean_snmp_output(line.split('=')[1].strip())
-                        interfaces[if_index] = {'name': if_name}
-                        current_if = if_index
-                    elif current_if and '1.3.6.1.2.1.2.2.1.6' in line:  # MAC
-                        mac = line.split('=')[1].strip()
-                        if 'Hex-STRING:' in mac:
-                            mac = mac.replace('Hex-STRING:', '').strip().replace(' ', ':')
-                        interfaces[current_if]['mac'] = mac
-                    elif current_if and '1.3.6.1.2.1.2.2.1.8' in line:  # Estado
-                        status = line.split('=')[1].strip()
-                        interfaces[current_if]['status'] = 'Up' if '1' in status else 'Down'
+                    if '=' not in line:
+                        continue
+                    
+                    oid_part, value_part = line.split('=', 1)
+                    oid_parts = oid_part.strip().split('.')
+                    if_index = oid_parts[-2]
+                    oid_type = oid_parts[-1]
+                    
+                    value = value_part.strip()
+                    
+                    if if_index not in interfaces:
+                        interfaces[if_index] = {}
+                    
+                    if oid_type == '2':  # Interface Description
+                        interfaces[if_index]['name'] = clean_snmp_output(value)
+                    elif oid_type == '6':  # MAC Address
+                        if 'Hex-STRING:' in value:
+                            mac = value.replace('Hex-STRING:', '').strip().upper()
+                            mac = ':'.join([mac[i:i+2] for i in range(0, len(mac), 2)])
+                            interfaces[if_index]['mac'] = mac
+                    elif oid_type == '8':  # Interface Status
+                        interfaces[if_index]['status'] = 'Up' if '1' in value else 'Down'
                 
                 device_info['Interfaces'] = interfaces
                 
         except Exception as e:
             console.print(f"[red]  Error obteniendo interfaces: {str(e)}[/red]")
         
-        if len(device_info) > 1:  # Si obtuvo al menos una respuesta SNMP
+        if len(device_info) > 1:
             results.append(device_info)
     
     return results
-
-def format_uptime(ticks):
-    """Formatea los ticks de uptime a días/horas/minutos"""
-    try:
-        ticks = int(ticks.split()[0]) // 100  # Convertir a segundos
-        days = ticks // (24*3600)
-        hours = (ticks % (24*3600)) // 3600
-        minutes = (ticks % 3600) // 60
-        return f"{days}d {hours}h {minutes}m"
-    except:
-        return ticks
 
 def main():
     # Verificar instalación de snmpget
@@ -157,7 +173,7 @@ def main():
                 device.get('System Name', 'N/A'),
                 device.get('System Description', 'N/A')[:50] + ('...' if len(device.get('System Description', '')) > 50 else ''),
                 device.get('Location', 'N/A'),
-                format_uptime(device.get('Uptime', 'N/A')),
+                device.get('Uptime', 'N/A'),
                 device.get('Contact', 'N/A')
             )
         
@@ -165,7 +181,7 @@ def main():
         
         # Tabla de interfaces para cada dispositivo
         for device in devices:
-            if 'Interfaces' in device:
+            if 'Interfaces' in device and device['Interfaces']:
                 if_table = Table(title=f"Interfaces de {device.get('System Name', device['ip'])}", 
                                header_style="bold green")
                 if_table.add_column("ID")
@@ -173,7 +189,7 @@ def main():
                 if_table.add_column("MAC")
                 if_table.add_column("Estado")
                 
-                for if_id, if_data in device['Interfaces'].items():
+                for if_id, if_data in sorted(device['Interfaces'].items(), key=lambda x: int(x[0])):
                     if_table.add_row(
                         if_id,
                         if_data.get('name', 'N/A'),
@@ -182,6 +198,8 @@ def main():
                     )
                 
                 console.print(if_table)
+            else:
+                console.print(f"[yellow]No se encontraron interfaces para {device.get('System Name', device['ip'])}[/yellow]")
     else:
         console.print("[red]No se encontraron dispositivos SNMP.[/red]")
     
